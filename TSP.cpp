@@ -10,6 +10,7 @@
 
 using std::cin;
 using std::cout;
+using std::cerr;
 using std::endl;
 using std::fstream;
 using std::string;
@@ -22,9 +23,20 @@ using sf::RenderWindow;
 using sf::Vertex;
 using sf::VideoMode;
 using sf::View;
+using sf::Keyboard;
+using sf::Vector2f;
+using sf::Lines;
 
-#define city_size 6
-#define maxiter 4
+// 1080 720
+
+#define CITY_CIRCLE_SIZE 6
+#define ITER 4
+
+const float WIDTH = VideoMode::getDesktopMode().width;
+const float HEIGHT = VideoMode::getDesktopMode().height;
+
+int x_offset = 0;
+int y_offset = 0;
 
 struct city
 {
@@ -38,29 +50,29 @@ struct draw_city
 	double y;
 };
 
-struct max_X_Y
+struct _X_Y
 {
 	double x;
 	double y;
 };
 
-void beolvas(fstream &file, city *&v, int &n)
+void read_nodes(fstream& file, city*& cities, int& numberOfCities)
 {
-	n = 0;
+	numberOfCities = 0;
 	double i, x, y;
-	v = (city *)malloc(sizeof(city));
-	while (file >> i && file >> v[n].x && file >> v[n].y)
+	cities = (city*)malloc(sizeof(city));
+	while (file >> i && file >> cities[numberOfCities].x && file >> cities[numberOfCities].y)
 	{
-		v = (city *)realloc(v, ((n++) + 2) * sizeof(city));
+		cities = (city*)realloc(cities, ((numberOfCities++) + 2) * sizeof(city));
 	}
 }
 
-int *Swap(int *route, int n, int i, int k)
+int* Swap(int* route, int numberOfCities, int i, int k)
 {
 
 	// Solution 1: Simple algorithm for swapping routes
 
-	int *new_route = new int[n];
+	int* new_route = new int[numberOfCities];
 	for (int j = 0; j < i; ++j)
 	{
 		new_route[j] = route[j];
@@ -71,7 +83,7 @@ int *Swap(int *route, int n, int i, int k)
 		new_route[j] = route[jj];
 	}
 
-	for (int j = k + 1; j < n; j++)
+	for (int j = k + 1; j < numberOfCities; j++)
 	{
 		new_route[j] = route[j];
 	}
@@ -90,26 +102,25 @@ double dist(city a, city b)
 	return sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2));
 }
 
-double calculateTotalDistance(city *v, int n, int *route)
+double calculateTotalDistance(city* cities, int numberOfCities, int* route)
 {
 	double sum = 0;
-	for (int i = 0; i < n - 1; i++)
+	for (int i = 0; i < numberOfCities - 1; i++)
 	{
-		sum += dist(v[route[i]], v[route[i + 1]]);
+		sum += dist(cities[route[i]], cities[route[i + 1]]);
 	}
-	sum += dist(v[route[0]], v[route[n - 1]]);
+	sum += dist(cities[route[0]], cities[route[numberOfCities - 1]]);
 	return sum;
 }
 
-int *greedy(city *v, int n, int start)
+int* greedy(city* cities, int numberOfCities, int start)
 {
-
-	int *route = new int[n];
+	int* route = new int[numberOfCities];
 
 	double min;
 	int minind;
-	double ujmin;
-	bool volt[n];
+	double new_min;
+	bool visited[numberOfCities];
 	int k = 1;
 	int i;
 	int ii;
@@ -117,38 +128,38 @@ int *greedy(city *v, int n, int start)
 	double best_distance;
 	double new_distance;
 
-	for (int j = 0; j < n; j++)
+	for (int j = 0; j < numberOfCities; j++)
 	{
 		route[j] = j;
-		volt[j] = false;
+		visited[j] = false;
 	}
-	volt[start] = true;
+	visited[start] = true;
 	route[0] = start;
 	i = start;
 
-	while (k < n)
+	while (k < numberOfCities)
 	{
 		ii = 0;
-		while (volt[ii] == true)
+		while (visited[ii] == true)
 		{
 			ii++;
 		}
-		min = dist(v[i], v[ii]);
+		min = dist(cities[i], cities[ii]);
 		minind = ii;
 
-		for (int j = 0; j < n; j++)
+		for (int j = 0; j < numberOfCities; j++)
 		{
-			if (!volt[j])
+			if (!visited[j])
 			{
-				ujmin = dist(v[i], v[j]);
-				if (ujmin < min)
+				new_min = dist(cities[i], cities[j]);
+				if (new_min < min)
 				{
-					min = ujmin;
+					min = new_min;
 					minind = j;
 				}
 			}
 		}
-		volt[minind] = true;
+		visited[minind] = true;
 		route[k] = minind;
 		i = minind;
 		k++;
@@ -157,20 +168,20 @@ int *greedy(city *v, int n, int start)
 	return route;
 }
 
-int *greedy_best(city *v, int n)
+int* greedy_best(city* cities, int numberOfCities)
 {
-	int *route = greedy(v, n, 0);
-	double best_distance = calculateTotalDistance(v, n, route);
+	int* route = greedy(cities, numberOfCities, 0);
+	double best_distance = calculateTotalDistance(cities, numberOfCities, route);
 	double new_distance;
 
-	for (int i = 1; i < n; i++)
+	for (int i = 1; i < numberOfCities; i++)
 	{
-		int *new_route = greedy(v, n, i);
-		new_distance = calculateTotalDistance(v, n, new_route);
+		int* new_route = greedy(cities, numberOfCities, i);
+		new_distance = calculateTotalDistance(cities, numberOfCities, new_route);
 		if (new_distance < best_distance)
 		{
 			best_distance = new_distance;
-			for (int j = 0; j < n; j++)
+			for (int j = 0; j < numberOfCities; j++)
 			{
 				route[j] = new_route[j];
 			}
@@ -179,44 +190,131 @@ int *greedy_best(city *v, int n)
 	return route;
 }
 
-max_X_Y maximum(city *v, int n)
+_X_Y imum(city* cities, int numberOfCities)
 {
-	max_X_Y m;
-	m.x = v[0].x;
-	m.y = v[0].y;
-	for (int i = 1; i < n; ++i)
+	_X_Y m;
+	m.x = cities[0].x;
+	m.y = cities[0].y;
+	for (int i = 1; i < numberOfCities; ++i)
 	{
-		if (v[i].x > m.x)
+		if (cities[i].x > m.x)
 		{
-			m.x = v[i].x;
+			m.x = cities[i].x;
 		}
-		if (v[i].y > m.y)
+		if (cities[i].y > m.y)
 		{
-			m.y = v[i].y;
+			m.y = cities[i].y;
 		}
 	}
 	return m;
 }
 
-draw_city *resize(city *v, int n, max_X_Y m, int w, int h)
+draw_city* resize(city* cities, int numberOfCities, _X_Y m, int w, int h)
 {
 
-	draw_city *aux = new draw_city[n];
+	draw_city* aux = new draw_city[numberOfCities];
 
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < numberOfCities; ++i)
 	{
-		aux[i].x = (v[i].x / m.x) * w;
-		aux[i].y = (v[i].y / m.y) * h;
+		aux[i].x = (cities[i].x / m.x) * w;
+		aux[i].y = (cities[i].y / m.y) * h;
 	}
 	return aux;
 }
 
-void print_route(int *route, int n, double best_distance)
+void _2_opt(RenderWindow& window, CircleShape* circle, draw_city* resized_city, int numberOfCities, city* cities, int* route, int* new_route, int new_distance, int best_distance)
+{
+	int improvement = 0;
+	bool ok;
+
+	while (improvement <= ITER)
+	{
+		ok = true;
+		for (int i = 1; i < numberOfCities - 1 && ok; i++)
+		{
+			for (int k = i + 1; k < numberOfCities && ok; k++)
+			{
+				new_route = Swap(route, numberOfCities, i, k);
+				new_distance = calculateTotalDistance(cities, numberOfCities, new_route);
+				if (new_distance < best_distance)
+				{
+					best_distance = new_distance;
+
+					for (int ii = 0; ii < numberOfCities; ii++)
+					{
+						route[ii] = new_route[ii];
+					}
+
+					window.clear();
+
+					for (int i = 0; i < numberOfCities; i++)
+					{
+						circle[i].setPosition(resized_city[i].x, resized_city[i].y);
+						window.draw(circle[i]);
+					}
+
+					// Draw lines between the nodes
+					for (int l = 0; l < numberOfCities - 1; l++)
+					{
+						Vertex line[] = {
+							Vertex(Vector2f(resized_city[route[l]].x + CITY_CIRCLE_SIZE,
+												resized_city[route[l]].y + CITY_CIRCLE_SIZE)),
+							Vertex(Vector2f(resized_city[route[l + 1]].x + CITY_CIRCLE_SIZE,
+												resized_city[route[l + 1]].y + CITY_CIRCLE_SIZE)) };
+						window.draw(line, 2, Lines);
+					}
+
+					window.display();
+					improvement = 0;
+					ok = false;
+				}
+			}
+		}
+		improvement++;
+	}
+
+
+
+	window.display();
+}
+
+void draw_view(RenderWindow& window, CircleShape* circle, draw_city* resized_city, int numberOfCities, int* route)
+{
+	for (int i = 0; i < numberOfCities; i++)
+	{
+		circle[i].setPosition(resized_city[i].x, resized_city[i].y);
+		window.draw(circle[i]);
+	}
+
+	Vertex line[] = {
+		Vertex(Vector2f(resized_city[route[0]].x + CITY_CIRCLE_SIZE,
+							resized_city[route[0]].y + CITY_CIRCLE_SIZE),
+			   Color::Red),
+		Vertex(Vector2f(resized_city[route[numberOfCities - 1]].x + CITY_CIRCLE_SIZE,
+							resized_city[route[numberOfCities - 1]].y + CITY_CIRCLE_SIZE),
+			   Color::Red) };
+
+	window.draw(line, 2, Lines);
+
+	for (int l = 0; l < numberOfCities - 1; l++)
+	{
+		Vertex line[] = {
+			Vertex(Vector2f(resized_city[route[l]].x + CITY_CIRCLE_SIZE,
+								resized_city[route[l]].y + CITY_CIRCLE_SIZE),
+				   Color::Red),
+			Vertex(Vector2f(resized_city[route[l + 1]].x + CITY_CIRCLE_SIZE,
+								resized_city[route[l + 1]].y + CITY_CIRCLE_SIZE),
+				   Color::Red) };
+		window.draw(line, 2, Lines);
+	}
+}
+
+void print_route(int* route, int numberOfCities, double best_distance)
 {
 	cout << "Best distance 	: " << best_distance << endl;
 	cout << "Best route 	: " << endl;
 	cout << route[0];
-	for (int i = 1; i < n; ++i)
+	for (int i = 1; i < numberOfCities; ++i)
 	{
 		cout << " -> " << route[i];
 	}
@@ -239,224 +337,124 @@ void print_usage()
 	cout << "	-> Esc 					Key: Close the application" << endl;
 }
 
-int main(int argv, char **argc)
+int main(int argv, char** argc)
 {
-
 	srand(time(NULL));
 
-	RenderWindow window(VideoMode(VideoMode::getDesktopMode().width, VideoMode::getDesktopMode().height, 32),
-						"Travelling Salesman",
-						sf::Style::Titlebar | sf::Style::Fullscreen);
+	RenderWindow window(VideoMode(WIDTH, HEIGHT, 32),
+		"Travelling Salesman");
 
 	// Change input node coords here :)
 	fstream file("tsp1.txt");
 
 	View view;
-	view.setSize(VideoMode::getDesktopMode().width, VideoMode::getDesktopMode().height);
+	view.setSize(WIDTH, HEIGHT);
 
-	int n = 0;
-	city *v;
+	int numberOfCities = 0;
+	city* cities;
 
-	beolvas(file, v, n);
-	max_X_Y m = maximum(v, n);
-
-	draw_city *resized_city = new draw_city[n];
-	double w = VideoMode::getDesktopMode().width;
-	double h = VideoMode::getDesktopMode().height;
-
-	resized_city = resize(v, n, m, w, h);
-
-	int sorrend[n];
-	double tav;
-	int k = 0;
-	double max;
-	int ind1, ind2;
+	read_nodes(file, cities, numberOfCities);
+	_X_Y m = imum(cities, numberOfCities);
+	draw_city* resized_city = new draw_city[numberOfCities];
+	resized_city = resize(cities, numberOfCities, m, WIDTH, HEIGHT);
 
 	double best_distance;
 	double new_distance;
-	bool ok;
-	int improvement = 0;
-	int *route = new int[n];
-	int *new_route = new int[n];
+	int* route = new int[numberOfCities];
+	int* new_route = new int[numberOfCities];
 
-	sf::CircleShape *circle = new sf::CircleShape[n];
-	for (int i = 0; i < n; i++)
+	CircleShape* circle = new CircleShape[numberOfCities];
+
+	for (int i = 0; i < numberOfCities; i++)
 	{
-		circle[i].setRadius(city_size);
+		circle[i].setRadius(CITY_CIRCLE_SIZE);
 		circle[i].setFillColor(sf::Color(rand() % 255, rand() % 255, rand() % 255));
 	}
 
-	// First run the greedy algorithm
-	route = greedy_best(v, n);
-
-	best_distance = calculateTotalDistance(v, n, route);
-
-	window.clear();
-	for (int i = 0; i < n; i++)
-	{
-		circle[i].setPosition(resized_city[i].x, resized_city[i].y);
-		window.draw(circle[i]);
-	}
-	for (int l = 0; l < n - 1; l++)
-	{
-		Vertex line[] = {
-			Vertex(sf::Vector2f(resized_city[route[l]].x + city_size,
-								resized_city[route[l]].y + city_size)),
-			Vertex(sf::Vector2f(resized_city[route[l + 1]].x + city_size,
-								resized_city[route[l + 1]].y + city_size))};
-		window.draw(line, 2, sf::Lines);
-	}
-	window.display();
-
+	route = greedy_best(cities, numberOfCities);
+	best_distance = calculateTotalDistance(cities, numberOfCities, route);
+	bool route_found = false;
 	print_usage();
 
-	View traverse_view;
 
 	while (window.isOpen())
 	{
 		Event event;
-		View view = window.getView();
+		view = window.getView();
+
 		while (window.pollEvent(event))
 		{
-			if (event.type == sf::Event::Closed)
-				window.close();
-			if (event.key.code == sf::Keyboard::Escape)
-				window.close();
-		}
 
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
-		{
-			view.move(-2, 0);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
-		{
-			view.move(2, 0);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-		{
-			view.move(0, -2);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-		{
-			view.move(0, 2);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z))
-		{
-			view.zoom(0.997f);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::X))
-		{
-			view.zoom(1.003f);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-		{
-			view.rotate(0.2);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-		{
-			view.rotate(-0.2);
-			window.setView(view);
-		}
-		else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-		{
-			window.setView(window.getDefaultView());
-		}
-
-		// 2-opt algorithm to optimize the route length
-		while (improvement <= maxiter)
-		{
-			ok = true;
-
-			for (int i = 1; i < n - 1 && ok; i++)
+			switch (event.type)
 			{
-				for (int k = i + 1; k < n && ok; k++)
+			case Event::Closed:
+				window.close();
+				break;
+			case Event::KeyPressed:
+				switch (event.key.code)
 				{
-					new_route = Swap(route, n, i, k);
-					new_distance = calculateTotalDistance(v, n, new_route);
-
-					if (new_distance < best_distance)
-					{
-						best_distance = new_distance;
-
-						for (int ii = 0; ii < n; ii++)
-						{
-							route[ii] = new_route[ii];
-						}
-
-						window.clear();
-
-						for (int i = 0; i < n; i++)
-						{
-							circle[i].setPosition(resized_city[i].x, resized_city[i].y);
-							window.draw(circle[i]);
-						}
-
-						// Draw lines between the nodes
-						for (int l = 0; l < n - 1; l++)
-						{
-							Vertex line[] = {
-								Vertex(sf::Vector2f(resized_city[route[l]].x + city_size,
-													resized_city[route[l]].y + city_size)),
-								Vertex(sf::Vector2f(resized_city[route[l + 1]].x + city_size,
-													resized_city[route[l + 1]].y + city_size))};
-							window.draw(line, 2, sf::Lines);
-						}
-
-						window.display();
-						improvement = 0;
-						ok = false;
-					}
+				case Keyboard::Escape:
+					window.close();
+					break;
+				case Keyboard::Left:
+					view.move(-10, 0);
+					window.setView(view);
+					break;
+				case Keyboard::Right:
+					view.move(10, 0);
+					window.setView(view);
+					break;
+				case Keyboard::Up:
+					view.move(0, -10);
+					window.setView(view);
+					break;
+				case Keyboard::Down:
+					view.move(0, 10);
+					window.setView(view);
+					break;
+				case Keyboard::Z:
+					view.zoom(0.98f);
+					window.setView(view);
+					break;
+				case Keyboard::X:
+					view.zoom(1.02f);
+					window.setView(view);
+					break;
+				case Keyboard::A:
+					view.rotate(1);
+					window.setView(view);
+					break;
+				case Keyboard::S:
+					view.rotate(-1);
+					window.setView(view);
+					break;
+				case Keyboard::D:
+					window.setView(window.getDefaultView());
+					break;
+				default:
+					break;
 				}
+			default:
+				break;
 			}
-			improvement++;
+		}
+
+		if (!route_found) {
+			_2_opt(window, circle, resized_city, numberOfCities, cities, route, new_route, new_distance, best_distance);
+			print_route(route, numberOfCities, best_distance);
+			route_found = true;
 		}
 
 		window.clear();
-
-		for (int i = 0; i < n; i++)
-		{
-			circle[i].setPosition(resized_city[i].x, resized_city[i].y);
-			window.draw(circle[i]);
-		}
-
-		Vertex line[] = {
-			Vertex(sf::Vector2f(resized_city[route[0]].x + city_size,
-								resized_city[route[0]].y + city_size),
-				   Color::Red),
-			Vertex(sf::Vector2f(resized_city[route[n - 1]].x + city_size,
-								resized_city[route[n - 1]].y + city_size),
-				   Color::Red)};
-		window.draw(line, 2, sf::Lines);
-
-		for (int l = 0; l < n - 1; l++)
-		{
-			Vertex line[] = {
-				Vertex(sf::Vector2f(resized_city[route[l]].x + city_size,
-									resized_city[route[l]].y + city_size),
-					   Color::Red),
-				Vertex(sf::Vector2f(resized_city[route[l + 1]].x + city_size,
-									resized_city[route[l + 1]].y + city_size),
-					   Color::Red)};
-			window.draw(line, 2, sf::Lines);
-		}
-
+		draw_view(window, circle, resized_city, numberOfCities, route);
 		window.display();
 	}
-
-	print_route(route, n, best_distance);
 
 	delete[] route;
 	delete[] new_route;
 	delete[] circle;
 	delete[] resized_city;
-	delete[] v;
+	delete[] cities;
 
-	return 0;
+	return EXIT_SUCCESS;
 }
