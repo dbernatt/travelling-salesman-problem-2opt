@@ -1,5 +1,6 @@
 
 .vscode
+.editorconfig
 
 # Compiled Object files
 *.slo
