@@ -13,13 +13,17 @@ In **2-opt** is a simple local search algorithm for solving the [traveling sales
 Operating system: **Ubuntu 20.04.3**
 
 1. Install **Sfml** dependency.
+
    `$ sudo apt-get install libsfml-dev`
 
 2. Compile.
+
    `$ make`
 
 3. Start.
+
    `$ ./TSP`
 
 4. Cleanup :).
+
    `$ make clean`
